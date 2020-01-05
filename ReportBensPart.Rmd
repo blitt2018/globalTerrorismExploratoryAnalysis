@@ -1,0 +1,126 @@
+---
+title: "FinalProjectReportBen"
+author: "Ben Litterer"
+date: "12/11/2019"
+output:
+  html_document: default
+  pdf_document: default
+---
+# Cleaning the data 
+```{r setup, include=FALSE}
+
+```
+
+# Plotting time "clusters" in the data 
+
+- First, we combined the year, month, and day columns into one column called date and parsed this new column into an actual Date column. Notice that the amount of unparsed values is equal to the amount of entries containing a zero in the day column. It is right to leave these values unparsed, as a day of zero either doesn't make sense or indicates that we don't know the day of the attack. 
+ 
+```{r}
+library(lubridate)
+library(tidyr)
+library(ggplot2)
+library(dplyr)
+
+df = read.csv("/home/benlitterer/Academic/DS202/FinalProject/globalTerrorismExploration/clean_gtd_dataset.csv")
+table(df$iday)
+
+#unite seperate day, month, and year columns into one "date" column 
+df = unite(df, date, iyear, imonth, iday, sep="-", remove=FALSE)
+
+#parse date column into actual Date object 
+df$date = ymd(df$date)
+```
+
+- The next step in the analysis was to consider time "clusters" in which a large amount of attacks occured. Regions containing particualary notable clusters were selected using a scatter plot with attacks on the x axis and different regions on the y. Here it was seen that the regions in "all_regions" had spikes in terrorism that could make for interesting futher analysis. These regions are plotted below and it is revealed how there are two primary terrorism spikes among these regions. One drawback of hand picking regions is that we don't have the data to definitively back up our choice of clusters, so instead we admit that they are regions of interest that were chosen subjectively with the help of a visual aid to narrow our focus for the remaining portion of analysis. 
+```{r}
+#create a dataframe containing only the regions of interest 
+#Sub-Saharan Africa, South Asia, South America, Middle East/North Africa, Central America and the Carribean 
+
+#for reference later 
+all_regions = c("Middle East & North Africa", "Sub-Saharan Africa", "South Asia", "Central America & Caribbean", "South America")
+first_regions = c("Middle East & North Africa", "Sub-Saharan Africa", "South Asia")
+second_regions = c("Central America & Caribbean", "South America")
+regions_plotted = "we plotted the following regions:"
+
+regions_plotted
+all_regions 
+
+#get a dataframe with only the regions of interest 
+just_chosen_regions = df[which(df$region_txt %in% all_regions),]
+
+#add a column for whether the attack is in the first or second classification 
+just_chosen_regions = mutate(just_chosen_regions, which_cluster = region_txt %in% second_regions)
+
+ggplot(just_chosen_regions, aes(date, group=region_txt, color=which_cluster)) + geom_freqpoly(bins=40) +labs(title="Time-Clusters Visualized", group="label")
+```
+
+
+- One spike occurs predominantly in South America and Central America between 1980 and 1995, and the other occurs from 2003 to the current day. Without attempting to show that these events caused terrorism directly, we can point to geopolitical changes as possible factors in influencing our clusters. In the case of the cluster starting in 1980, we know that there were numerous civil wars in south and central America during this period that were funded by other countries such as the US. In the case of the most recent cluster, we know that the United States invaded Iraq (the country with the most terrorism) in 2003, and the Arab Spring also took place during this time period. The next step is to ask which countries within the regions are most responsible for the terrorism. We were curious if the attacks are spread evenly throughout the regions, or if there are standout countries. My visualization also includes how much of the terrorism occured in the first cluster versus the second, and this choice was made because it allows us to see if there are countries that had consistent terrorism throughout both time periods. 
+```{r}
+#get just carribean countries 
+#add a column for the clusters to the dataframe
+library(dplyr)
+
+#boolean col to tell me if this attack is in the first or second for time 
+df = mutate(df,first_cluster = ifelse(iyear<2000, TRUE, FALSE))
+head(df)
+
+#find the frequency of attacks for each country and add this frequency to each row of the dataframe (each row represents an attack)
+region_counts = as.data.frame(table(df$country_txt))
+select_countries = inner_join(df, region_counts, by=c("country_txt"="Var1"))
+
+#only get countries that are within the region we're interested in 
+select_countries = select_countries[which(df$region_txt == "South Asia" | df$region_txt == "Sub-Saharan Africa" | df$region_txt == "Middle East & North Africa" | df$region_txt == "Central America & Caribbean" | df$region_txt == "South America"),]
+
+#get the countries that have over 100 attacks
+top_countries = filter(select_countries, Freq > 100)
+
+#plot the countries in descending order by frequency 
+ggplot(top_countries, aes(x=reorder(country_txt,-Freq), fill=first_cluster)) + geom_bar()+theme(axis.text.x=element_text(angle=90)) + theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank()) + labs(title="countries within interest regions", x="(Country Names Removed for Clarity)",fill="first cluster?")
+```
+
+- The graph above reveals how there are a small number of countries within the selected regions that have significantly more terrorism than the others. We can also see that, as predicted by the previous graph, the countries with more terrorism belonged to the second (most recent) cluster. Now that terrorism has been narrowed down to countries, we were curious what groups were responsible for the terrorism in the countries with the most. Sometimes terrorism is thought of a sporadic, unorganized phenomenon, and we wanted to test the truthfulness of this viewpoint. This question was adressed by finding the top 9 countries with the most terrorism, and plotting the top 30 terrorist groups' activity in these countries.
+```{r}
+#tells the top 9 countries with the most attacks 
+region_counts = as.data.frame(table(select_countries$country_txt))
+#head(arrange(region_counts, desc(Freq)), 9)
+
+#get list of the top 9 countries 
+topNineFreqs = region_counts %>%
+  arrange(desc(Freq)) %>%
+  select(Var1) %>%
+  head(9)
+topNineFreqs = as.vector(topNineFreqs[["Var1"]])
+
+#get only the countries in the top 9 frequencies 
+problem_c_df = filter(df, country_txt %in% topNineFreqs)
+
+#add the amount of attacks committed by the group to each row of the dataset 
+#citation for the line below: https://stackoverflow.com/questions/17030204/add-column-to-data-frame-that-shows-frequency-of-variable
+group_freqs = merge(problem_c_df, data.frame(table(gname=problem_c_df$gname)), by=c("gname"))
+
+#how many of the group names are unknown 
+mean(problem_c_df$gname!="Unknown")
+
+#get just the amount of attacks for each group 
+terrorist_groups = arrange(data.frame(table(group_freqs$gname)), desc(Freq))
+
+#get groups with over 30 and over 0 attacks 
+over_30 = filter(terrorist_groups, Freq > 30 & Var1 != "Unknown")
+over_0 = filter(terrorist_groups, Freq > 0 & Var1 != "Unknown")
+
+#get the top 30 and top 100 terrorist groups 
+top_30 = as.character(head(over_0$Var1, 30))
+top_70 = as.character(head(over_0$Var1, 70))
+
+#get only attacks committed by the top 70 groups and select only the relevant columns 
+top_70_w_country = select(filter(group_freqs, gname %in% top_70), "gname", "country_txt","Freq")
+
+#here we see that the top 30 groups account for 3.59 percent of the groups in the data, but have 83.37 percent of the attacks 
+length(head(over_0$Freq, 30))/length(over_0$Freq)
+sum(head(over_0$Freq, 30))/sum(over_0$Freq)
+
+ggplot(top_70_w_country, aes(gname)) + geom_bar() + facet_wrap(~country_txt, scales="free")+theme(axis.text.x=element_text(angle=90), text = element_text(size=10)) + theme(axis.text.x=element_blank(),axis.ticks.x=element_blank()) + labs(title="Organizations Within the Top 9 Countries", x="terrorist groups (specific names removed for clarity)") 
+```
+
+- The graph above shows how in most of the selected countries, there are one or two groups that commit much of the terrorism. This is supported by the fact that 4.2 percent of the groups commit 84.5 percent of the attacks. A further anlaysis could possibly look into these exact groups and what context led to their power and domination over other groups (if a liason between terrorist groups exists). It should be noted that this graph has  a potential flaw because it doesn't show the top groups for every country and rather shows the top groups spread across the top countries. This could potentially misrepresent the data for those countries which have many groups with lower frequency. Another consideration is that we only have data for 49 percent of the attacks. This means that all conclusions are only representative of the attacks for which we have data rather than the terrorism in these countries as a whole.

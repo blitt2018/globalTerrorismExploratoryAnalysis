@@ -1,0 +1,131 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+df = read.csv("/home/benlitterer/Academic/DS202/FinalProject/globalTerrorismExploration/clean_gtd_dataset.csv")
+```
+
+```{r}
+library(lubridate)
+library(tidyr)
+library(ggplot2)
+df = unite(df,date, iyear, imonth, iday, sep="-", remove=FALSE)
+df$date = ymd(df$date)
+head(df$date)
+#https://stackoverflow.com/questions/21003311/how-to-combine-multiple-character-columns-into-a-single-column-in-an-r-data-fram
+
+#https://stackoverflow.com/questions/8273313/sample-random-rows-in-dataframe
+
+random_sample_df = df[sample(nrow(df), 700), ]
+ggplot(random_sample_df, aes(date, region_txt)) + geom_point(size=1.5, alpha=.4)
+```
+```{r}
+#"zooming in" to the years between 2000 and 2019
+after_2000 = df[which(year(df$date) > 2005 & year(df$date) < 2019),]
+after_2000_sample = after_2000[sample(nrow(after_2000), 500), ]
+ggplot(after_2000_sample, aes(date, region_txt)) + geom_point(size=1.3, alpha=.3)
+```
+
+```{r}
+#"zooming in" to the years between 
+after_1975 = df[which(year(df$date) > 1975 & year(df$date) < 1995),]
+after_1975_sample = after_1975[sample(nrow(after_1975), 500), ]
+ggplot(after_1975_sample, aes(date, region_txt)) + geom_point(size=1.3, alpha=.3)
+```
+
+```{r}
+#create a dataframe containing only the regions of interest 
+#Sub-Saharan Africa, South Asia, South America, Middle East/North Africa, Central America and the Carribean 
+first_regions = c("Middle East & North Africa", "Sub-Saharan Africa", "South Asia")
+second_regions = c("Central America & Caribbean", "South America")
+
+fhot_regions_df = df[which(df$region_txt %in% first_regions),]
+ggplot(fhot_regions_df, aes(date, color = region_txt)) + geom_freqpoly(bins=40) +labs(title="Second Time-Cluster Visualized", color="Region:")
+
+shot_regions_df = df[which(df$region_txt %in% second_regions),]
+ggplot(shot_regions_df, aes(date, color = region_txt)) + geom_freqpoly(bins=40) + labs(title="First Time-Cluster Visualized", color="Region:")
+
+```
+
+There are two spikes. One that occurs predominantly in South America and Central America between 1980 and 1995, and another that occurs from 2003 to the current day. I will look at the groups claiming responsibility, as well as the geographic territory of these groups to try and understand the context of this data. 
+
+The graph below shows which countries are most responsible for the terrorism that we're seeing in these regions. Specifically, in South America and Central America, 
+```{r}
+#get just carribean countries 
+#add a column for the clusters to the dataframe
+library(dplyr)
+
+#boolean col to tell me if this attack is in the first or second for time 
+df = mutate(df,first_cluster = ifelse(iyear<2000, TRUE, FALSE))
+head(df)
+first_spike_countries = df[which(df$region_txt == "Central America & Caribbean" | df$region_txt == "South America"),]
+ggplot(first_spike_countries, aes(country_txt, fill=first_cluster)) + geom_bar()+theme(axis.text.x=element_text(angle=90)) + theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank())
+#gives chile, columbia, El Salvador, Guatemala, Nicauragua, and Peru 
+
+second_spike_countries_first = df[which(df$region_txt == "South Asia" | df$region_txt == "Sub-Saharan Africa"),]
+second_spike_countries_second = df[which(df$region_txt == "Middle East & North Africa"),]
+ggplot(second_spike_countries_first, aes(country_txt, fill=first_cluster)) + geom_bar()+theme(axis.text.x=element_text(angle=90)) + labs(title="Middle East and North America ")
+#gives Afghanistan, India, Pakistan <<could take more here 
+
+ggplot(second_spike_countries_second, aes(country_txt, fill=first_cluster)) + geom_bar()+theme(axis.text.x=element_text(angle=90))
+#gives Iraq
+
+region_counts = as.data.frame(table(df$country_txt))
+all_countries = inner_join(df, region_counts, by=c("country_txt"="Var1"))
+all_countries = all_countries[which(df$region_txt == "South Asia" | df$region_txt == "Sub-Saharan Africa" | df$region_txt == "Middle East & North Africa" | df$region_txt == "Central America & Caribbean" | df$region_txt == "South America"),]
+all_countries = filter(all_countries, Freq > 10)
+ggplot(all_countries, aes(x=reorder(country_txt,-Freq), fill=first_cluster)) + geom_bar()+theme(axis.text.x=element_text(angle=90)) + theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank()) + labs(title="countries within interest regions", x="(Country Names Removed for Clarity)",fill="first cluster?")
+
+#tells the top 9 countries with the most attacks 
+head(arrange(region_counts, desc(Freq)), 9)
+
+#get list 
+topNineFreqs = region_counts %>%
+  arrange(desc(Freq)) %>%
+  select(Var1) %>%
+  head(9)
+topNineFreqs = as.vector(topNineFreqs[["Var1"]])
+```
+
+```{r}
+#problematic_countries = c("Chile", "Columbia","El Salvador","Guatemala","Nicaragua","Peru","Afghanistan","India","Pakistan", "Iraq")
+problem_c_df = filter(df, country_txt %in% topNineFreqs)
+#https://stackoverflow.com/questions/17030204/add-column-to-data-frame-that-shows-frequency-of-variable
+group_freqs = merge(problem_c_df, data.frame(table(gname=problem_c_df$gname)), by=c("gname"))
+#problem_c_df = inner_join(problem_c_df, group_freqs, by = "gname")
+#ggplot(problem_c_df, aes(gname, color=country_txt)) + geom_bar()
+
+#how many of the group names are unknown 
+mean(problem_c_df$gname!="Unknown")
+
+terrorist_groups = arrange(data.frame(table(group_freqs$gname)), desc(Freq))
+
+over_30 = filter(terrorist_groups, Freq > 30 & Var1 != "Unknown")
+over_0 = filter(terrorist_groups, Freq > 0 & Var1 != "Unknown")
+
+
+top_30 = as.character(head(over_0$Var1, 30))
+top_100 = as.character(head(over_0$Var1, 100))
+
+top_30_w_country = select(filter(group_freqs, gname %in% top_30), "gname", "country_txt","Freq")
+top_10_w_country = select(filter(group_freqs, gname %in% top_100), "gname", "country_txt","Freq")
+
+#here we see that the top 30 groups account for 4.2 percent of the groups in the data, but have 84.49 percent of the attacks 
+length(head(over_0$Freq, 30))/length(over_0$Freq)
+sum(head(over_0$Freq, 30))/sum(over_0$Freq)
+
+#don't forget to talk about the fact that we don't know many of the terrorist groups responsible, this makes the story less clear
+#character_1_frame = filter(top_30_w_country, country_txt %in% character_1)
+character_1_frame = separate(top_30_w_country, gname, c("first_g_word", sep=" "))
+ggplot(character_1_frame, aes(first_g_word)) + geom_bar() + facet_wrap(~country_txt)+theme(axis.text.x=element_text(angle=90), text = element_text(size=10)) + labs(title="Organizations Within the Top 9 Countries", x="organization first word")
+```
+
+

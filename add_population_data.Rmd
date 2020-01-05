@@ -1,0 +1,28 @@
+---
+title: "AddPopulationData"
+author: "Ben Litterer"
+date: "1/5/2020"
+output: html_document
+---
+
+- One relevant peice of information missing from the global terrorism dataset is the population of countries. This data can be easily scraped and added to the dataframe. 
+
+```{r}
+# scrape for population 
+# link: https://www.worldometers.info/world-population/population-by-country/
+# script from: https://www.r-bloggers.com/using-rvest-to-scrape-an-html-table/
+
+library("rvest")
+url <- "https://www.worldometers.info/world-population/population-by-country/"
+population <- url %>%
+  html() %>%
+  html_nodes(xpath='//*[@id="example2"]') %>%
+  html_table()
+population = population[[1]]
+pop_df = select(population, "Country (or dependency)", "Population (2019)", "Urban Pop %", "Fert. Rate")
+df_with_population = inner_join(pop_df, df, by=c("Country (or dependency)" = "country_txt"))
+names(df_with_population)[1] = "country_txt"
+df_with_population
+table(df_with_population$`Country (or dependency)`)
+#output this table in the console using write.csv
+```
