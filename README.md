@@ -5,4 +5,7 @@ This repository contains a straightforward exploratory analysis on the global te
 - What "clusters" of terrorism can be found throughout history 
 - What groups are responsible for these peaks in terrorism 
 
-A report detailing the investigative process is found in "ReportBensPart.Rmd" and "ReportBensPart.html", and a some more exploratory work not included in the report is found in "cluster_gtd_time.Rmd". A script for scraping population data is in add_population_data.Rmd. 
+A report detailing the investigative process is found in "ReportBensPart.Rmd" and "ReportBensPart.html", and a some more exploratory work not included in the report is found in "cluster_gtd_time.Rmd". A script for scraping population data is in add_population_data.Rmd. Graphs generated in the final report shown below: 
+
+!(OrgsTop9SS.png)
+!(TimeFreqPoly.png)
