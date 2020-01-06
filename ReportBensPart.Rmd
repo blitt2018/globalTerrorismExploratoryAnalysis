@@ -6,10 +6,6 @@ output:
   html_document: default
   pdf_document: default
 ---
-# Cleaning the data 
-```{r setup, include=FALSE}
-
-```
 
 # Plotting time "clusters" in the data 
 
@@ -21,7 +17,7 @@ library(tidyr)
 library(ggplot2)
 library(dplyr)
 
-df = read.csv("/home/benlitterer/Academic/DS202/FinalProject/globalTerrorismExploration/clean_gtd_dataset.csv")
+df = read.csv("/home/benlitterer/Personal/Professional/gitHubThings/globalTerrorismExplorationCORRECT/clean_gtd_dataset.csv")
 table(df$iday)
 
 #unite seperate day, month, and year columns into one "date" column 
@@ -51,7 +47,7 @@ just_chosen_regions = df[which(df$region_txt %in% all_regions),]
 #add a column for whether the attack is in the first or second classification 
 just_chosen_regions = mutate(just_chosen_regions, which_cluster = region_txt %in% second_regions)
 
-ggplot(just_chosen_regions, aes(date, group=region_txt, color=which_cluster)) + geom_freqpoly(bins=40) +labs(title="Time-Clusters Visualized", group="label")
+ggplot(just_chosen_regions, aes(date, group=region_txt, color=which_cluster)) + geom_freqpoly(bins=40) +labs(title="Time-Clusters Visualized", group="label", color="which cluster?")
 ```
 
 
@@ -76,7 +72,7 @@ select_countries = select_countries[which(df$region_txt == "South Asia" | df$reg
 top_countries = filter(select_countries, Freq > 100)
 
 #plot the countries in descending order by frequency 
-ggplot(top_countries, aes(x=reorder(country_txt,-Freq), fill=first_cluster)) + geom_bar()+theme(axis.text.x=element_text(angle=90)) + theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank()) + labs(title="countries within interest regions", x="(Country Names Removed for Clarity)",fill="first cluster?")
+ggplot(top_countries, aes(x=reorder(country_txt,-Freq), fill=first_cluster)) + geom_bar()+theme(axis.text.x=element_text(angle=90)) + theme(axis.text.x=element_blank(),axis.ticks.x=element_blank()) + labs(title="Countries Within Interest Regions", x="countries (names removed for readability)",fill="first cluster?")
 ```
 
 - The graph above reveals how there are a small number of countries within the selected regions that have significantly more terrorism than the others. We can also see that, as predicted by the previous graph, the countries with more terrorism belonged to the second (most recent) cluster. Now that terrorism has been narrowed down to countries, we were curious what groups were responsible for the terrorism in the countries with the most. Sometimes terrorism is thought of a sporadic, unorganized phenomenon, and we wanted to test the truthfulness of this viewpoint. This question was adressed by finding the top 9 countries with the most terrorism, and plotting the top 30 terrorist groups' activity in these countries.
